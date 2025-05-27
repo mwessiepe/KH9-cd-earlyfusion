@@ -1,6 +1,9 @@
 import os
-from functools import reduce
-import argparse
+import sys
+import time
+import yaml
+import subprocess
+import webbrowser
 import geopandas as gpd
 from torchgeo.datasets.utils import BoundingBox
 
@@ -12,13 +15,6 @@ from src.predict import predict
 def read_rois_from_geopackage(path, layer=None):
     """
     Reads geometries from a GeoPackage and converts each geometry into a TorchGeo BoundingBox.
-
-    Args:
-        path (str): Path to the GeoPackage file.
-        layer (str, optional): Name of the layer to read. If None, reads the default layer.
-
-    Returns:
-        List[BoundingBox]: A list of BoundingBox objects corresponding to each geometry.
     """
     gdf = gpd.read_file(path, layer=layer)
     bboxes = []
@@ -31,50 +27,77 @@ def read_rois_from_geopackage(path, layer=None):
     return bboxes
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=["train", "test", "predict"])
-    parser.add_argument("task", choices=['baseline', 'ChangeStarFarSeg'], default='baseline')
-    parser.add_argument("experiment_name" )
-    parser.add_argument("--checkpoint_name", default=None, help="Checkpoint name to load (e.g. 'last' or a specific file name)")
-    parser.add_argument("--patch_size", default=256)
-    args = parser.parse_args()
+def main():
+    if len(sys.argv) != 2:
+        print("Usage: python main.py path/to/config.yaml")
+        sys.exit(1)
 
-    experiment_dir = os.path.join('C:/masterarbeit/early_fusion/results', args.experiment_name)
+    config_path = sys.argv[1]
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
 
-    predictions_dir = 'C:/masterarbeit/predictions'
-    
-    rois = read_rois_from_geopackage('C:/masterarbeit/vector/dataset_splits.gpkg')
+    # Validate required config fields
+    required = [
+        "mode", "task", "experiment_name", "patch_size",
+        "results_root", "log_dir", "rois_path", "predictions_root"
+    ]
+    for field in required:
+        if field not in config:
+            raise ValueError(f"Missing required config field: '{field}'")
 
+    # Derived fields
+    config["experiment_dir"] = os.path.join(config["results_root"], config["experiment_name"])
+    config["rois"] = read_rois_from_geopackage(config["rois_path"])
+    config.setdefault("checkpoint_name", None)
+    config.setdefault("aoi", None)
 
-    # Parameters shared by train and test
-    config = {
-        # "old_images_dir": 'C:/masterarbeit/raster/KH-9/amsterdam/georeferenced/', # For predictions
-        "old_images_dir": 'C:/masterarbeit/raster/KH-9/amsterdam/georeferenced/filtered',
-        "new_images_dir": 'C:/masterarbeit/raster/aerial_images_2023',
-        "bag_buildings_dir": 'C:/masterarbeit/vector/buildings',
-        "experiment_name": args.experiment_name,
-        "experiment_dir": experiment_dir,
-        "log_dir": 'C:/masterarbeit/early_fusion/logs',
-        "batch_size": 10,
-        "patch_size": int(args.patch_size),
-        "learning_rate": 0.0001,
-        "num_dataloader_workers": 11,
-        "val_split_pct": 0.2,
-        "test_split_pct": 0.1,
-        "checkpoint_name": args.checkpoint_name,
-        "rois": rois,
-        "aoi": None,
-        "task": args.task,
-    }
+    # Dispatch mode
+    mode = config["mode"]
 
-    if args.mode == "train":
-        train(
-            model='unet',
-            backbone='resnet50',
-            **config)
-    elif args.mode == "test":
+    # Launch TensorBoard
+    tb_process = subprocess.Popen([
+        "tensorboard",
+        "--logdir", os.path.join(config["log_dir"], config["experiment_name"]),
+        "--port", "6006"  # optional, choose port
+    ])
+
+    time.sleep(1)
+    webbrowser.open("http://localhost:6006")
+
+    if mode == "train":
+        try:
+            train(
+                old_images_dir=config["old_images_dir"],
+                new_images_dir=config["new_images_dir"],
+                bag_buildings_dir=config["bag_buildings_dir"],
+                experiment_name=config["experiment_name"],
+                experiment_dir=config["experiment_dir"],
+                log_dir=config["log_dir"],
+                model=config["model"],
+                backbone=config["backbone"],
+                batch_size=config["batch_size"],
+                patch_size=config["patch_size"],
+                learning_rate=config["learning_rate"],
+                num_dataloader_workers=config["num_dataloader_workers"],
+                val_split_pct=config["val_split_pct"],
+                test_split_pct=config["test_split_pct"],
+                checkpoint_name=config["checkpoint_name"],
+                rois=config["rois"],
+                aoi=config["aoi"],
+                task=config["task"]
+            )
+
+        finally: 
+            tb_process.terminate()
+
+    elif mode == "test":
         test(**config)
-    elif args.mode == "predict":
-        predict(predictions_dir=os.path.join(predictions_dir, args.experiment_name),
-                **config)
+    elif mode == "predict":
+        predictions_dir = os.path.join(config["predictions_root"], config["experiment_name"])
+        predict(predictions_dir=predictions_dir, **config)
+    else:
+        raise ValueError(f"Invalid mode: {mode}")
+
+
+if __name__ == "__main__":
+    main()

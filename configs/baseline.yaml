@@ -1,0 +1,27 @@
+mode: train
+experiment_name: arch1
+
+# Paths
+old_images_dir: /mnt/masterarbeit/raster/KH-9/amsterdam/georeferenced/filtered
+new_images_dir: /mnt/masterarbeit/raster/aerial_images_2023
+bag_buildings_dir: /mnt/masterarbeit/vector/buildings
+log_dir: /mnt/masterarbeit/early_fusion/logs
+results_root: /mnt/masterarbeit/early_fusion/results
+predictions_root: /mnt/masterarbeit/predictions
+rois_path: /mnt/masterarbeit/vector/dataset_splits.gpkg
+
+# Model
+task: baseline
+model: unet
+backbone: resnet50
+
+# Hyperparameters
+batch_size: 10
+patch_size: 256
+learning_rate: 0.0001
+num_dataloader_workers: 11
+val_split_pct: 0.2
+test_split_pct: 0.1
+
+# Optional
+checkpoint_name: last
