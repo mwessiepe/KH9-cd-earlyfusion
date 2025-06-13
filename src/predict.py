@@ -12,8 +12,7 @@ from src.datamodule import KH9CdDataModule
 from src.task import CustomSemanticSegmentationTask, ChangeStarFarSegTask
 
 def predict(old_images_dir, new_images_dir, bag_buildings_dir,
-            experiment_name, experiment_dir, log_dir, batch_size,
-            patch_size, learning_rate, num_dataloader_workers,
+            experiment_dir, batch_size, patch_size, num_dataloader_workers,
             val_split_pct, test_split_pct, checkpoint_name, rois, aoi, task, predictions_dir):
     torch.set_float32_matmul_precision('medium')
 

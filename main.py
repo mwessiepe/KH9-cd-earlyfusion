@@ -50,6 +50,10 @@ def main():
     config["rois"] = read_rois_from_geopackage(config["rois_path"])
     config.setdefault("checkpoint_name", None)
     config.setdefault("aoi", None)
+    config.setdefault("model", None)
+    config.setdefault("backbone", None)
+    config.setdefault("encoder_old_name", None)
+    config.setdefault("encoder_new_name", None)
 
     # Dispatch mode
     mode = config["mode"]
@@ -74,6 +78,8 @@ def main():
                 experiment_dir=config["experiment_dir"],
                 log_dir=config["log_dir"],
                 model=config["model"],
+                encoder_old_name=config["encoder_old_name"],
+                encoder_new_name=config["encoder_new_name"],
                 backbone=config["backbone"],
                 batch_size=config["batch_size"],
                 patch_size=config["patch_size"],
@@ -91,10 +97,47 @@ def main():
             tb_process.terminate()
 
     elif mode == "test":
-        test(**config)
+        try:
+            test(
+                old_images_dir=config["old_images_dir"],
+                new_images_dir=config["new_images_dir"],
+                bag_buildings_dir=config["bag_buildings_dir"],
+                experiment_name=config["experiment_name"],
+                experiment_dir=config["experiment_dir"],
+                log_dir=config["log_dir"],
+                batch_size=config["batch_size"],
+                patch_size=config["patch_size"],
+                num_dataloader_workers=config["num_dataloader_workers"],
+                val_split_pct=config["val_split_pct"],
+                test_split_pct=config["test_split_pct"],
+                checkpoint_name=config["checkpoint_name"],
+                rois=config["rois"],
+                aoi=config["aoi"],
+                task=config["task"]
+            )
+        finally:
+            tb_process.terminate()
     elif mode == "predict":
         predictions_dir = os.path.join(config["predictions_root"], config["experiment_name"])
-        predict(predictions_dir=predictions_dir, **config)
+        try:
+            predict(
+                old_images_dir=config["old_images_dir"],
+                new_images_dir=config["new_images_dir"],
+                bag_buildings_dir=config["bag_buildings_dir"],
+                experiment_dir=config["experiment_dir"],
+                batch_size=config["batch_size"],
+                patch_size=config["patch_size"],
+                num_dataloader_workers=config["num_dataloader_workers"],
+                val_split_pct=config["val_split_pct"],
+                test_split_pct=config["test_split_pct"],
+                checkpoint_name=config["checkpoint_name"],
+                rois=config["rois"],
+                aoi=config["aoi"],
+                task=config["task"],
+                predictions_dir=predictions_dir
+            )
+        finally:
+            tb_process.terminate()
     else:
         raise ValueError(f"Invalid mode: {mode}")
 

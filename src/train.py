@@ -8,7 +8,7 @@ from .datamodule import KH9CdDataModule
 
 
 def train(old_images_dir, new_images_dir, bag_buildings_dir, experiment_name,
-          experiment_dir, log_dir, model, backbone, batch_size, patch_size,
+          experiment_dir, log_dir, model, backbone, encoder_old_name, encoder_new_name, batch_size, patch_size,
           learning_rate, num_dataloader_workers, val_split_pct, test_split_pct,
           checkpoint_name, rois, aoi, task):
 
@@ -43,6 +43,16 @@ def train(old_images_dir, new_images_dir, bag_buildings_dir, experiment_name,
         task = ChangeStarFarSegTask(
             backbone=backbone,
             lr=learning_rate,
+        )
+    elif task == 'dualencoder':
+        from .task import DualEncoderChangeDetectionTask
+        task = DualEncoderChangeDetectionTask(
+            encoder_old_name=encoder_old_name,
+            encoder_new_name=encoder_new_name,
+            num_classes=2,
+            lr=learning_rate,
+            weights=True,
+            ignore_index=99,
         )
 
     checkpoint_callback = ModelCheckpoint(
