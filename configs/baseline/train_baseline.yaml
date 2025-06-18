@@ -1,5 +1,5 @@
 mode: train
-experiment_name: 250604_unet_resnet34
+experiment_name: 250618_unet_resnet34
 
 # Paths
 old_images_dir: /home/moritz/masterarbeit/raster/KH-9/amsterdam/georeferenced/filtered
@@ -14,10 +14,11 @@ rois_path: /home/moritz/masterarbeit/vector/dataset_splits.gpkg
 task: baseline
 model: unet
 backbone: resnet34
+loss: focal
 
 # Hyperparameters
-batch_size: 10
-patch_size: 256
+batch_size: 5
+patch_size: 1024
 learning_rate: 0.0001
 num_dataloader_workers: 11
 val_split_pct: 0.2

@@ -16,11 +16,10 @@ from .augmentations import BitemporalAugmentationModule
 
 
 class CustomSemanticSegmentationTask(SemanticSegmentationTask):
-    def __init__(self, *args, **kwargs):
-        # if 'ignore_index' in kwargs:
-        #     del kwargs['ignore']
+    def __init__(self, *args, predictions_dir=None, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.predictions_dir = predictions_dir
         self.train_augmentations = BitemporalAugmentationModule()
     
     def plot(self, sample: dict):
@@ -158,11 +157,7 @@ class CustomSemanticSegmentationTask(SemanticSegmentationTask):
 
         # Move prediction to CPU
         preds = y_hat_hard.cpu()
-
-        # Define the directory for saving predictions
-        predictions_dir = "/home/moritz/masterarbeit/predictions"
-        os.makedirs(predictions_dir, exist_ok=True)
-
+    
         for i, sample in enumerate(unbind_samples({**batch, "prediction": preds})):
             prediction = sample["prediction"].numpy().astype("uint8")
             bounds = sample["bounds"]
@@ -173,7 +168,7 @@ class CustomSemanticSegmentationTask(SemanticSegmentationTask):
                                     prediction.shape[1], prediction.shape[0])
 
             # Build file path
-            output_path = os.path.join(predictions_dir, f"pred_{batch_idx:04}_{i}.tif")
+            output_path = os.path.join(self.predictions_dir, f"pred_{batch_idx:04}_{i}.tif")
 
             # Save prediction as GeoTIFF
             with rasterio.open(
@@ -383,12 +378,11 @@ class DualEncoderChangeDetectionTask(LightningModule):
     ):
         super().__init__()
         self.save_hyperparameters()
-        # Old image encoder (e.g., 1 channel)
+        print(f"[DualEncoder] Init: encoder_old_name={encoder_old_name}, encoder_new_name={encoder_new_name}, num_classes={num_classes}, lr={lr}, weights={weights}, ignore_index={ignore_index}")
         self.encoder_old = models.__dict__[encoder_old_name](
             pretrained=weights
         )
         self.encoder_old.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
-        # New image encoder (e.g., 3 channels)
         self.encoder_new = models.__dict__[encoder_new_name](
             pretrained=weights
         )
@@ -406,10 +400,10 @@ class DualEncoderChangeDetectionTask(LightningModule):
         self.train_augmentations = BitemporalAugmentationModule()
 
     def forward(self, x):
-        # x: [B, 4, H, W] (old: [B,1,H,W], new: [B,3,H,W])
+        print(f"[DualEncoder] Forward: x.shape={x.shape}")
         old_img = x[:, 0:1, :, :]
         new_img = x[:, 1:4, :, :]
-        # Encode old image
+        print(f"[DualEncoder] old_img.shape={old_img.shape}, new_img.shape={new_img.shape}")
         if hasattr(self.encoder_old, 'forward_features'):
             old_feat = self.encoder_old.forward_features(old_img)
         else:
@@ -433,22 +427,24 @@ class DualEncoderChangeDetectionTask(LightningModule):
             new = self.encoder_new.layer3(new)
             new = self.encoder_new.layer4(new)
             new_feat = self.encoder_new.avgpool(new)
-        # Remove extra dims if needed
+        print(f"[DualEncoder] old_feat.shape={old_feat.shape}, new_feat.shape={new_feat.shape}")
         if old_feat.ndim == 4 and old_feat.shape[2] == 1 and old_feat.shape[3] == 1:
             old_feat = old_feat.squeeze(-1).squeeze(-1)
         if new_feat.ndim == 4 and new_feat.shape[2] == 1 and new_feat.shape[3] == 1:
             new_feat = new_feat.squeeze(-1).squeeze(-1)
-        # Reshape to [B, C, 1, 1] if needed
         if old_feat.ndim == 2:
             old_feat = old_feat.unsqueeze(-1).unsqueeze(-1)
         if new_feat.ndim == 2:
             new_feat = new_feat.unsqueeze(-1).unsqueeze(-1)
-        # Fuse features
+        print(f"[DualEncoder] old_feat (after squeeze/unsqueeze): {old_feat.shape}, new_feat: {new_feat.shape}")
         fused = torch.cat([old_feat, new_feat], dim=1)
+        print(f"[DualEncoder] fused.shape={fused.shape}")
         fused = self.fuse_conv(fused)
-        # Upsample to input size
+        print(f"[DualEncoder] fused after fuse_conv: {fused.shape}")
         fused_up = F.interpolate(fused, size=x.shape[2:], mode="bilinear", align_corners=False)
+        print(f"[DualEncoder] fused_up.shape={fused_up.shape}")
         out = self.decoder(fused_up)
+        print(f"[DualEncoder] decoder out.shape={out.shape}, min={out.min().item()}, max={out.max().item()}")
         return out
 
     def plot(self, sample: dict):
@@ -481,19 +477,20 @@ class DualEncoderChangeDetectionTask(LightningModule):
     def training_step(self, batch, batch_idx):
         x = batch["image"]
         y = batch["mask"]
-        # Move to device
+        print(f"[DualEncoder] training_step: x.shape={x.shape}, y.shape={y.shape}, batch_idx={batch_idx}")
         x = x.to(self.device)
         y = y.to(self.device)
-        # Apply augmentations
         if self.train_augmentations is not None:
             self.train_augmentations = self.train_augmentations.to(self.device)
             x, y = self.train_augmentations(x, y)
             batch["image"] = x
             batch["mask"] = y
         y = y.squeeze(1)
-
         logits = self(x)
+        print(f"[DualEncoder] logits.shape={logits.shape}, logits.min={logits.min().item()}, logits.max={logits.max().item()}")
+        print(f"[DualEncoder] y unique: {torch.unique(y)}")
         loss = self.criterion(logits, y)
+        print(f"[DualEncoder] loss={loss.item()}")
         self.log("train_loss", loss, on_step=True, on_epoch=True)
         # Optionally log images
         if batch_idx < 10 and hasattr(self, "logger") and self.logger is not None:
@@ -514,7 +511,10 @@ class DualEncoderChangeDetectionTask(LightningModule):
         x = batch["image"]
         y = batch["mask"].squeeze(1)
         logits = self(x)
+        print(f"[DualEncoder] [VAL] logits.shape={logits.shape}, min={logits.min().item()}, max={logits.max().item()}")
+        print(f"[DualEncoder] [VAL] y unique: {torch.unique(y)}")
         loss = self.criterion(logits, y)
+        print(f"[DualEncoder] [VAL] loss={loss.item()}")
         self.log("val_loss", loss, on_step=False, on_epoch=True)
         # Optionally log images
         if batch_idx < 10 and hasattr(self, "logger") and self.logger is not None:
@@ -534,7 +534,10 @@ class DualEncoderChangeDetectionTask(LightningModule):
         x = batch["image"]
         y = batch["mask"].squeeze(1)
         logits = self(x)
+        print(f"[DualEncoder] [TEST] logits.shape={logits.shape}, min={logits.min().item()}, max={logits.max().item()}")
+        print(f"[DualEncoder] [TEST] y unique: {torch.unique(y)}")
         loss = self.criterion(logits, y)
+        print(f"[DualEncoder] [TEST] loss={loss.item()}")
         self.log("test_loss", loss, on_step=False, on_epoch=True)
         # Optionally log images
         self.logged_test_images = getattr(self, 'logged_test_images', 0)
@@ -554,9 +557,10 @@ class DualEncoderChangeDetectionTask(LightningModule):
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0 ):
         x = batch["image"]
-        y_hat_dict = self(x)
-        change_prob = y_hat_dict["change_prob"]
-        y_hat_hard = (change_prob > 0.5).long().squeeze(1)
+        logits = self(x)
+        print(f"[DualEncoder] [PREDICT] logits.shape={logits.shape}, min={logits.min().item()}, max={logits.max().item()}")
+        y_hat_hard = logits.argmax(dim=1)
+        print(f"[DualEncoder] [PREDICT] y_hat_hard unique: {torch.unique(y_hat_hard)}")
         preds = y_hat_hard.cpu()
         
         os.makedirs(self.predictions_dir, exist_ok=True)
@@ -582,4 +586,5 @@ class DualEncoderChangeDetectionTask(LightningModule):
         return preds
 
     def configure_optimizers(self):
+        print(f"[DualEncoder] configure_optimizers: lr={self.lr}")
         return torch.optim.Adam(self.parameters(), lr=self.lr)

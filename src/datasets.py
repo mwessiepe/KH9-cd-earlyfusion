@@ -1,28 +1,64 @@
 import torch
 import matplotlib.pyplot as plt
 from torchgeo.datasets import GeoDataset, RasterDataset, VectorDataset, IntersectionDataset
+from rasterio.enums import Resampling
 
 class AerialImages(RasterDataset):
     filename_glob = 'RGB*.tiff'
     is_image = True
 
-    def plot(self, sample):
-        image = sample['image'].permute(1, 2, 0)
-        image = torch.clamp(image/300, min=0, max=1).numpy()
-        fig, ax = plt.subplots()
-        ax.imshow(image)
-        return fig
+class AerialImagesAverage(RasterDataset):
+    filename_glob = 'RGB*.tiff'
+    is_image = True
+    resampling = Resampling.average
+
+class AerialImagesCubic(RasterDataset):
+    filename_glob = 'RGB*.tiff'
+    is_image = True
+    resampling = Resampling.cubic
+
+class AerialImagesLanczos(RasterDataset):
+    filename_glob = 'RGB*.tiff'
+    is_image = True
+    resampling = Resampling.lanczos
 
 
 class KH9Images(RasterDataset):
     filename_glob = 'output_feature_*.tif'
-    # filename_glob = '*clip.tif'
     is_image = True
+    # res = 0.25
+    resampling = Resampling.bilinear
+
+
+class KH9ImageFull(RasterDataset):
+    filename_glob = 'D3C1217-100203A010_epsg28992_clip.tif'
+    is_image = True
+    # res = 0.25
+    # resampling = Resampling.bilinear
+
+class KH9ImageFullBilinear(RasterDataset):
+    filename_glob = 'D3C1217-100203A010_epsg28992_clip.tif'
+    is_image = True
+    # res = 0.25
+    resampling = Resampling.bilinear
+
+class KH9ImageFullCubic(RasterDataset):
+    filename_glob = 'D3C1217-100203A010_epsg28992_clip.tif'
+    is_image = True
+    # res = 0.25
+    resampling = Resampling.cubic
+
+class KH9ImageFullLanczos(RasterDataset):
+    filename_glob = 'D3C1217-100203A010_epsg28992_clip.tif'
+    is_image = True
+    # res = 0.25
+    resampling = Resampling.lanczos
 
 
 class BagBuildings(VectorDataset):
     filename_glob = 'classified_buildings_binary.gpkg'
     is_image = False
+    res = 0.25
     
 class BitemporalIntersectionDataset(GeoDataset):
     def __init__(self, dataset_old, dataset_new, vector_dataset, transforms=None):

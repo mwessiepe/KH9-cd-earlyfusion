@@ -17,7 +17,7 @@ from kornia.augmentation import (
 )
 from kornia.constants import Resample
 
-from .datasets import KH9Images, AerialImages, BagBuildings, BitemporalIntersectionDataset
+from .datasets import KH9Images, KH9ImageFull, AerialImagesAverage, BagBuildings, BitemporalIntersectionDataset
 
 
 class KH9CdDataModule(LightningDataModule):
@@ -39,7 +39,7 @@ class KH9CdDataModule(LightningDataModule):
 
     def setup(self, stage=None):
         old = KH9Images(self.old_images_dir)
-        new = AerialImages(self.new_images_dir)
+        new = AerialImagesAverage(self.new_images_dir)
         bag_buildings = BagBuildings(
             paths=self.bag_buildings_dir, label_name="change_class")
         combined_dataset = IntersectionDataset(old, new) & bag_buildings
@@ -47,7 +47,8 @@ class KH9CdDataModule(LightningDataModule):
         
         self.train_dataset, self.val_dataset, self.test_dataset = roi_split(combined_dataset, rois=self.rois)
         if stage == "predict":
-            self.predict_dataset = combined_dataset
+            old_full = KH9ImageFull(self.old_images_dir)
+            self.predict_dataset = IntersectionDataset(old_full, new) & bag_buildings
 
     def transfer_batch_to_device(self, batch, device, dataloader_idx=0):
         # Move tensor data to the specified device
@@ -78,6 +79,6 @@ class KH9CdDataModule(LightningDataModule):
     def predict_dataloader(self):
         sampler = GridGeoSampler(
             self.predict_dataset, size=self.patch_size, stride=self.patch_size)
-        return DataLoader(self.predict_dataset, batch_size=2, sampler=sampler,
+        return DataLoader(self.predict_dataset, batch_size=self.batch_size, sampler=sampler,
                           num_workers=self.num_workers, collate_fn=stack_samples, persistent_workers=True)
 

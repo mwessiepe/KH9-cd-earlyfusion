@@ -31,10 +31,11 @@ def predict(old_images_dir, new_images_dir, bag_buildings_dir,
     )
 
     datamodule.setup("predict")
-
+    os.makedirs(predictions_dir, exist_ok=True)
     checkpoint_path = os.path.join(experiment_dir, checkpoint_name)
     if task == 'baseline':
         task = CustomSemanticSegmentationTask.load_from_checkpoint(checkpoint_path)
+        task.predictions_dir = predictions_dir
     elif task == 'ChangeStarFarSeg':
         task = ChangeStarFarSegTask.load_from_checkpoint(checkpoint_path)
         task.predictions_dir = predictions_dir
@@ -45,38 +46,4 @@ def predict(old_images_dir, new_images_dir, bag_buildings_dir,
         devices=[0],
         )
     trainer.predict(model=task, datamodule=datamodule)
-
-
-    # Output
-
-
-
-    # output_dir = os.path.join(experiment_dir, "predictions")
-    # os.makedirs(output_dir, exist_ok=True)
-
-    # # Loop through each prediction
-    # for i, batch_preds in enumerate(predictions):
-    #     # TorchGeo outputs a list of batches; each batch is a dict with prediction and metadata
-    #     for j, sample in enumerate(batch_preds):
-    #         pred = sample['prediction'].squeeze().cpu().numpy()  # shape: [H, W]
-    #         bounds = sample['bbox']  # This is a BoundingBox(minx, maxx, miny, maxy, mint, maxt)
-
-    #         height, width = pred.shape
-    #         transform = from_bounds(bounds.minx, bounds.maxx, bounds.miny, bounds.maxy, width, height)
-
-    #         output_path = os.path.join(output_dir, f"prediction_{i}_{j}.tif")
-    #         with rasterio.open(
-    #             output_path,
-    #             "w",
-    #             driver="GTiff",
-    #             height=height,
-    #             width=width,
-    #             count=1,
-    #             dtype=pred.dtype,
-    #             crs="EPSG:28992",  # Or replace with your actual CRS
-    #             transform=transform,
-    #         ) as dst:
-    #             dst.write(pred, 1)
-
-    #         print(f"Saved: {output_path}")
 

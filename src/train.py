@@ -8,7 +8,7 @@ from .datamodule import KH9CdDataModule
 
 
 def train(old_images_dir, new_images_dir, bag_buildings_dir, experiment_name,
-          experiment_dir, log_dir, model, backbone, encoder_old_name, encoder_new_name, batch_size, patch_size,
+          experiment_dir, log_dir, model, backbone, loss, encoder_old_name, encoder_new_name, batch_size, patch_size,
           learning_rate, num_dataloader_workers, val_split_pct, test_split_pct,
           checkpoint_name, rois, aoi, task):
 
@@ -35,7 +35,7 @@ def train(old_images_dir, new_images_dir, bag_buildings_dir, experiment_name,
             in_channels=4,
             num_classes=2,
             loss="ce",
-            ignore_index=99,
+            # ignore_index=99,
             lr=learning_rate,
             patience=10
         )

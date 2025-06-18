@@ -58,18 +58,19 @@ def main():
     # Dispatch mode
     mode = config["mode"]
 
-    # Launch TensorBoard
-    tb_process = subprocess.Popen([
-        "tensorboard",
-        "--logdir", os.path.join(config["log_dir"], config["experiment_name"]),
-        "--port", "6006"  # optional, choose port
-    ])
-
-    time.sleep(1)
-    webbrowser.open("http://localhost:6006")
-
+    
     if mode == "train":
         try:
+            # Launch TensorBoard
+            tb_process = subprocess.Popen([
+                "tensorboard",
+                "--logdir", os.path.join(config["log_dir"], config["experiment_name"]),
+                "--port", "6006"  # optional, choose port
+            ])
+
+            time.sleep(1)
+            webbrowser.open("http://localhost:6006")
+
             train(
                 old_images_dir=config["old_images_dir"],
                 new_images_dir=config["new_images_dir"],
@@ -78,6 +79,7 @@ def main():
                 experiment_dir=config["experiment_dir"],
                 log_dir=config["log_dir"],
                 model=config["model"],
+                loss=config["loss"],
                 encoder_old_name=config["encoder_old_name"],
                 encoder_new_name=config["encoder_new_name"],
                 backbone=config["backbone"],
@@ -97,47 +99,41 @@ def main():
             tb_process.terminate()
 
     elif mode == "test":
-        try:
-            test(
-                old_images_dir=config["old_images_dir"],
-                new_images_dir=config["new_images_dir"],
-                bag_buildings_dir=config["bag_buildings_dir"],
-                experiment_name=config["experiment_name"],
-                experiment_dir=config["experiment_dir"],
-                log_dir=config["log_dir"],
-                batch_size=config["batch_size"],
-                patch_size=config["patch_size"],
-                num_dataloader_workers=config["num_dataloader_workers"],
-                val_split_pct=config["val_split_pct"],
-                test_split_pct=config["test_split_pct"],
-                checkpoint_name=config["checkpoint_name"],
-                rois=config["rois"],
-                aoi=config["aoi"],
-                task=config["task"]
-            )
-        finally:
-            tb_process.terminate()
+        test(
+            old_images_dir=config["old_images_dir"],
+            new_images_dir=config["new_images_dir"],
+            bag_buildings_dir=config["bag_buildings_dir"],
+            experiment_name=config["experiment_name"],
+            experiment_dir=config["experiment_dir"],
+            log_dir=config["log_dir"],
+            batch_size=config["batch_size"],
+            patch_size=config["patch_size"],
+            num_dataloader_workers=config["num_dataloader_workers"],
+            val_split_pct=config["val_split_pct"],
+            test_split_pct=config["test_split_pct"],
+            checkpoint_name=config["checkpoint_name"],
+            rois=config["rois"],
+            aoi=config["aoi"],
+            task=config["task"]
+        )
     elif mode == "predict":
         predictions_dir = os.path.join(config["predictions_root"], config["experiment_name"])
-        try:
-            predict(
-                old_images_dir=config["old_images_dir"],
-                new_images_dir=config["new_images_dir"],
-                bag_buildings_dir=config["bag_buildings_dir"],
-                experiment_dir=config["experiment_dir"],
-                batch_size=config["batch_size"],
-                patch_size=config["patch_size"],
-                num_dataloader_workers=config["num_dataloader_workers"],
-                val_split_pct=config["val_split_pct"],
-                test_split_pct=config["test_split_pct"],
-                checkpoint_name=config["checkpoint_name"],
-                rois=config["rois"],
-                aoi=config["aoi"],
-                task=config["task"],
-                predictions_dir=predictions_dir
+        predict(
+            old_images_dir=config["old_images_dir"],
+            new_images_dir=config["new_images_dir"],
+            bag_buildings_dir=config["bag_buildings_dir"],
+            experiment_dir=config["experiment_dir"],
+            batch_size=config["batch_size"],
+            patch_size=config["patch_size"],
+            num_dataloader_workers=config["num_dataloader_workers"],
+            val_split_pct=config["val_split_pct"],
+            test_split_pct=config["test_split_pct"],
+            checkpoint_name=config["checkpoint_name"],
+            rois=config["rois"],
+            aoi=config["aoi"],
+            task=config["task"],
+            predictions_dir=predictions_dir
             )
-        finally:
-            tb_process.terminate()
     else:
         raise ValueError(f"Invalid mode: {mode}")
 
