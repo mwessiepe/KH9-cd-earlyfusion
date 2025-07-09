@@ -46,8 +46,8 @@ def test(old_images_dir, new_images_dir, bag_buildings_dir, experiment_name,
 
     # Run test with logger
     trainer = Trainer(
-        accelerator='gpu',
-        devices=[0],
+#        accelerator='gpu',
+#        devices=[0],
         logger=tb_logger,
     )
     trainer.test(model=task, datamodule=datamodule)

@@ -42,8 +42,8 @@ def predict(old_images_dir, new_images_dir, bag_buildings_dir,
     task.eval()
 
     trainer = Trainer(
-        accelerator="gpu", 
-        devices=[0],
+        # accelerator="gpu", 
+        # devices=[0],
         )
     trainer.predict(model=task, datamodule=datamodule)
 

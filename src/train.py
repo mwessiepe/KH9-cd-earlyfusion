@@ -79,8 +79,8 @@ def train(old_images_dir, new_images_dir, bag_buildings_dir, experiment_name,
         default_root_dir=experiment_dir,
         min_epochs=10,
         max_epochs=50,
-        accelerator='gpu',
-        devices=[0],
+        # accelerator='gpu',
+        # devices=[0],
         precision="16-mixed"
     )
     print(experiment_dir)

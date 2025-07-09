@@ -17,8 +17,9 @@ from .augmentations import BitemporalAugmentationModule
 
 class CustomSemanticSegmentationTask(SemanticSegmentationTask):
     def __init__(self, *args, predictions_dir=None, **kwargs):
+        # Remove unexpected keys that may come from checkpoint/config
+        kwargs.pop("ignore", None)
         super().__init__(*args, **kwargs)
-
         self.predictions_dir = predictions_dir
         self.train_augmentations = BitemporalAugmentationModule()
     

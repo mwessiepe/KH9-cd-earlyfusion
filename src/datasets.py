@@ -31,7 +31,7 @@ class KH9Images(RasterDataset):
 
 
 class KH9ImageFull(RasterDataset):
-    filename_glob = 'D3C1217-100203A010_epsg28992_clip.tif'
+    filename_glob = 'D3C1217-100203A010_epsg28992_clip*'
     is_image = True
     # res = 0.25
     # resampling = Resampling.bilinear

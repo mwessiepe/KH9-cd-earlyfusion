@@ -49,6 +49,7 @@ class KH9CdDataModule(LightningDataModule):
         if stage == "predict":
             old_full = KH9ImageFull(self.old_images_dir)
             self.predict_dataset = IntersectionDataset(old_full, new) & bag_buildings
+            # self.predict_dataset = combined_dataset
 
     def transfer_batch_to_device(self, batch, device, dataloader_idx=0):
         # Move tensor data to the specified device
