@@ -210,7 +210,18 @@ class ChangeStarFarSegTask(LightningModule):
         self.predictions_dir = predictions_dir
     
     def forward(self, x: torch.Tensor) -> dict:
-        return self.model(x)
+        # x: [B, 4, H, W] -> [B, 2, C, H, W]
+        # Split into t1 (1ch) and t2 (3ch)
+        x_t1 = x[:, 0:1, :, :]            # [B, 1, H, W]
+        x_t2 = x[:, 1:4, :, :]            # [B, 3, H, W]
+
+        # Duplicate t1 to 3 channels
+        x_t1_3ch = x_t1.repeat(1, 3, 1, 1)  # [B, 3, H, W]
+
+        # Stack bitemporal into shape [B, 2, 3, H, W]
+        x_bitemp = torch.stack([x_t1_3ch, x_t2], dim=1)
+        return self.model(x_bitemp)
+
     
     def plot(self, sample: dict):
         images = sample["image"]
