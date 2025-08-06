@@ -22,7 +22,25 @@ class CustomSemanticSegmentationTask(SemanticSegmentationTask):
         super().__init__(*args, **kwargs)
         self.predictions_dir = predictions_dir
         self.train_augmentations = BitemporalAugmentationModule()
+        self.weight_mask = None  # Will be initialized during prediction
     
+    def create_weight_mask(self, patch_size):
+        """Create a weight mask for blending overlapping regions."""
+        overlap = 64  # Default overlap size
+        weight = torch.ones((patch_size, patch_size), dtype=torch.float32)
+        
+        # Create gradual blending in overlap regions
+        for i in range(overlap):
+            # Linear weight from 0 to 1 for left and top edges
+            alpha = i / overlap
+            weight[i, :] *= alpha
+            weight[:, i] *= alpha
+            # Linear weight from 1 to 0 for right and bottom edges
+            weight[-(i+1), :] *= alpha
+            weight[:, -(i+1)] *= alpha
+        
+        return weight
+
     def plot(self, sample: dict):
         image = sample["image"].squeeze(0)  # [4, H, W]
         gt_mask = sample["mask"].squeeze(0).numpy()  # [H, W]
@@ -152,40 +170,43 @@ class CustomSemanticSegmentationTask(SemanticSegmentationTask):
             self.logged_test_images += 1
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
-        x = batch["image"]
-        y_hat = self(x)
-        y_hat_hard = y_hat.argmax(dim=1)  # [B, H, W]
+        x = batch["image"]  # shape: [B, C, H, W]
 
-        # Move prediction to CPU
-        preds = y_hat_hard.cpu()
-    
-        for i, sample in enumerate(unbind_samples({**batch, "prediction": preds})):
-            prediction = sample["prediction"].numpy().astype("uint8")
+        # Initialize weight mask if not already done
+        if self.weight_mask is None:
+            patch_size = x.shape[-1]  # Assuming square patches
+            self.weight_mask = self.create_weight_mask(patch_size).to(x.device)  # shape: [H, W]
+
+        y_hat = self(x)  # shape: [B, 3, H, W] — raw logits
+        weighted_logits = y_hat * self.weight_mask.unsqueeze(0).unsqueeze(0)  # [B, 3, H, W]
+
+        for i, sample in enumerate(unbind_samples({**batch})):
+            logits = weighted_logits[i]  # shape: [3, H, W]
+            weight = self.weight_mask.cpu().numpy().astype("float32")
             bounds = sample["bounds"]
             crs = sample["crs"]
 
-            # Compute the affine transformation
             transform = from_bounds(bounds.minx, bounds.miny, bounds.maxx, bounds.maxy,
-                                    prediction.shape[1], prediction.shape[0])
+                                    weight.shape[1], weight.shape[0])
 
-            # Build file path
             output_path = os.path.join(self.predictions_dir, f"pred_{batch_idx:04}_{i}.tif")
-
-            # Save prediction as GeoTIFF
             with rasterio.open(
                 output_path,
                 "w",
                 driver="GTiff",
-                height=prediction.shape[0],
-                width=prediction.shape[1],
-                count=1,
-                dtype="uint8",
+                height=weight.shape[0],
+                width=weight.shape[1],
+                count=4,  # 3 classes + 1 weight mask
+                dtype="float32",
                 crs=crs,
                 transform=transform,
             ) as dst:
-                dst.write(prediction, 1)
+                for c in range(3):
+                    dst.write(logits[c].cpu().numpy().astype("float32"), c + 1)
+                dst.write(weight, 4)
 
-        return preds
+        return weighted_logits.cpu()
+
 
 
 class ChangeStarFarSegTask(LightningModule):
