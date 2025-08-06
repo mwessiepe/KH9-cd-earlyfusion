@@ -3,7 +3,7 @@ from torch import Tensor
 from torch.utils.data import DataLoader
 from torchgeo.samplers import RandomGeoSampler, GridGeoSampler, RandomBatchGeoSampler
 from torchgeo.datasets import IntersectionDataset, stack_samples
-from torchgeo.datasets import roi_split
+from torchgeo.datasets import roi_split, random_grid_cell_assignment
 from torchgeo.datasets.utils import BoundingBox
 from torchgeo.datamodules import GeoDataModule
 from lightning.pytorch import LightningDataModule
@@ -46,11 +46,22 @@ class KH9CdDataModule(LightningDataModule):
         combined_dataset = IntersectionDataset(old, new) & bag_buildings
         # combined_dataset = BitemporalIntersectionDataset(old, new, bag_buildings)
         
-        self.train_dataset, self.val_dataset, self.test_dataset = roi_split(combined_dataset, rois=self.rois)
-        if stage == "predict":
-            old_full = KH9ImageFull(self.old_images_dir)
-            self.predict_dataset = IntersectionDataset(old_full, new) & bag_buildings
-            # self.predict_dataset = combined_dataset
+        # Split Dataset using ROIS
+        # self.train_dataset, self.val_dataset, self.test_dataset = roi_split(combined_dataset, rois=self.rois)
+        # if stage == "predict":
+        #     old_full = KH9ImageFull(self.old_images_dir)
+        #     self.predict_dataset = IntersectionDataset(old_full, new) & bag_buildings
+        #     # self.predict_dataset = combined_dataset
+
+        # Split dataset using Random Grid for each BBox in the combined_dataset.
+        fractions = [1 - self.val_split_pct - self.test_split_pct,
+                     self.val_split_pct, self.test_split_pct]
+        self.train_dataset, self.val_dataset, self.test_dataset = random_grid_cell_assignment(
+            dataset=combined_dataset,
+            fractions=fractions,
+            grid_size=8,
+            generator=torch.Generator().manual_seed(42)
+        )
 
     def transfer_batch_to_device(self, batch, device, dataloader_idx=0):
         # Move tensor data to the specified device
