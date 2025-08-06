@@ -29,34 +29,14 @@ class KH9Images(RasterDataset):
     # res = 0.25
     resampling = Resampling.bilinear
 
-
 class KH9ImageFull(RasterDataset):
-    filename_glob = 'D3C1217-100203A010_epsg28992_clip*'
+    filename_glob = 'D3C1217-100203A010_co_latest.tif'
+    # filename_glob = 'test/*.tif'
     is_image = True
-    # res = 0.25
-    # resampling = Resampling.bilinear
-
-class KH9ImageFullBilinear(RasterDataset):
-    filename_glob = 'D3C1217-100203A010_epsg28992_clip.tif'
-    is_image = True
-    # res = 0.25
-    resampling = Resampling.bilinear
-
-class KH9ImageFullCubic(RasterDataset):
-    filename_glob = 'D3C1217-100203A010_epsg28992_clip.tif'
-    is_image = True
-    # res = 0.25
-    resampling = Resampling.cubic
-
-class KH9ImageFullLanczos(RasterDataset):
-    filename_glob = 'D3C1217-100203A010_epsg28992_clip.tif'
-    is_image = True
-    # res = 0.25
-    resampling = Resampling.lanczos
 
 
 class BagBuildings(VectorDataset):
-    filename_glob = 'classified_buildings_binary.gpkg'
+    filename_glob = 'reviewed_buildings.gpkg'
     is_image = False
     res = 0.25
     

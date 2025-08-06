@@ -17,12 +17,12 @@ from kornia.augmentation import (
 )
 from kornia.constants import Resample
 
-from .datasets import KH9Images, KH9ImageFull, AerialImagesAverage, BagBuildings, BitemporalIntersectionDataset
+from .datasets import KH9Images, KH9ImageFull, AerialImagesCubic, BagBuildings, BitemporalIntersectionDataset
 
 
 class KH9CdDataModule(LightningDataModule):
     def __init__(self, old_images_dir, new_images_dir, bag_buildings_dir, batch_size,
-                 num_workers, val_split_pct, test_split_pct, patch_size, rois, aoi: BoundingBox = None,):
+                 num_workers, val_split_pct, test_split_pct, patch_size, rois, aoi: BoundingBox = None, overlap=0):
         super().__init__()
         self.old_images_dir = old_images_dir
         self.new_images_dir = new_images_dir
@@ -35,13 +35,14 @@ class KH9CdDataModule(LightningDataModule):
         self.rois = rois
         self.aoi = aoi
         self.predict_dataset = None
+        self.overlap = overlap
         
 
     def setup(self, stage=None):
         old = KH9Images(self.old_images_dir)
-        new = AerialImagesAverage(self.new_images_dir)
+        new = AerialImagesCubic(self.new_images_dir)
         bag_buildings = BagBuildings(
-            paths=self.bag_buildings_dir, label_name="change_class")
+            paths=self.bag_buildings_dir, label_name="change_class_reviewed")
         combined_dataset = IntersectionDataset(old, new) & bag_buildings
         # combined_dataset = BitemporalIntersectionDataset(old, new, bag_buildings)
         
@@ -78,8 +79,10 @@ class KH9CdDataModule(LightningDataModule):
                           num_workers=self.num_workers, collate_fn=stack_samples, persistent_workers=True)
 
     def predict_dataloader(self):
+        # Use a smaller stride than patch_size to create overlap
+        stride = self.patch_size - self.overlap if self.overlap > 0 else self.patch_size
         sampler = GridGeoSampler(
-            self.predict_dataset, size=self.patch_size, stride=self.patch_size)
+            self.predict_dataset, size=self.patch_size, stride=stride)
         return DataLoader(self.predict_dataset, batch_size=self.batch_size, sampler=sampler,
                           num_workers=self.num_workers, collate_fn=stack_samples, persistent_workers=True)
 
