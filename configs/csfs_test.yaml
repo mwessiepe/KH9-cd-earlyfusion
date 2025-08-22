@@ -1,5 +1,5 @@
 mode: train
-experiment_name: 250709_3classtest
+experiment_name: 250709_csfstest
 
 # Paths
 old_images_dir: /home/moritz/masterarbeit/raster/KH-9/amsterdam/georeferenced/filtered
@@ -11,8 +11,8 @@ predictions_root: /home/moritz/masterarbeit/predictions
 rois_path: /home/moritz/masterarbeit/vector/dataset_splits.gpkg
 
 # Model
-task: baseline
-model: unet
+task: ChangeStarFarSeg
+# model: unet
 backbone: resnet34
 loss: focal
 
